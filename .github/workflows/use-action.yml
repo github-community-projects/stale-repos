@@ -23,7 +23,7 @@ jobs:
         with:
           persist-credentials: false
       - name: Run stale_repos tool
-        uses: docker://ghcr.io/github-community-projects/stale_repos:v7
+        uses: docker://ghcr.io/github-community-projects/stale_repos:v9
         env:
           GH_TOKEN: ${{ secrets.GH_TOKEN }}
           ORGANIZATION: github
