@@ -13,6 +13,9 @@ __pycache__/
 # C extensions
 *.so
 
+# ai
+**/.claude/*.local.*
+
 # Distribution / packaging
 .Python
 build/
