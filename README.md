@@ -305,19 +305,21 @@ jobs:
 ## Local usage without Docker
 
 1. Have Python v3.11 or greater installed
+1. [Install uv](https://docs.astral.sh/uv/getting-started/installation/)
 1. Copy `.env-example` to `.env`
 1. Fill out the `.env` file with a _token_ from a user that has access to the organization to scan (listed below). Tokens should have admin:org or read:org access.
 1. Fill out the `.env` file with the desired _inactive_days_ value. This should be a whole positive number representing the amount of inactivity that you want for flagging stale repos.
 1. (Optional) Fill out the `.env` file with the [repository topics](https://docs.github.com/en/repositories/managing-your-repositorys-settings-and-features/customizing-your-repository/classifying-your-repository-with-topics) _exempt_topics_ that you want to filter out from the stale repos report. This should be a comma separated list of topics.
 1. (Optional) Fill out the `.env` file with the exact _organization_ that you want to search in
 1. (Optional) Fill out the `.env` file with the exact _URL_ of the GitHub Enterprise that you want to search in. Keep empty if you want to search in the public `github.com`.
-1. `pip install -r requirements.txt`
-1. Run `python3 ./stale_repos.py`, which will output a list of repositories and the length of their inactivity
+1. `uv sync`
+1. Run `uv run python3 ./stale_repos.py`, which will output a list of repositories and the length of their inactivity
 
 ## Local testing without Docker
 
 1. Have Python v3.11 or greater installed
-1. `pip install -r requirements.txt -r requirements-test.txt`
+1. [Install uv](https://docs.astral.sh/uv/getting-started/installation/)
+1. `uv sync`
 1. `make lint`
 1. `make test`
 
