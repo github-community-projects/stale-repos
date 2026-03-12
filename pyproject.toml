@@ -19,6 +19,6 @@ dev = [
     "pylint==4.0.5",
     "pytest==9.0.2",
     "pytest-cov==7.0.0",
-    "types-python-dateutil==2.9.0.20260124",
+    "types-python-dateutil==2.9.0.20260302",
     "types-requests==2.32.4.20260107",
 ]
