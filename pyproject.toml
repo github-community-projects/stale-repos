@@ -6,7 +6,7 @@ requires-python = ">=3.11"
 dependencies = [
     "github3-py==4.0.1",
     "python-dateutil==2.9.0.post0",
-    "python-dotenv==1.2.1",
+    "python-dotenv==1.2.2",
 ]
 
 [dependency-groups]
@@ -16,7 +16,7 @@ dev = [
     "isort==7.0.0",
     "mypy==1.19.1",
     "mypy-extensions==1.1.0",
-    "pylint==4.0.4",
+    "pylint==4.0.5",
     "pytest==9.0.2",
     "pytest-cov==7.0.0",
     "types-python-dateutil==2.9.0.20260124",
