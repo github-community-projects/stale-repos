@@ -18,12 +18,17 @@ jobs:
       issues: write
       packages: read
     steps:
+      - name: Harden the runner (Audit all outbound calls)
+        uses: step-security/harden-runner@58077d3c7e43986b6b15fba718e8ea69e387dfcc # v2.15.1
+        with:
+          egress-policy: audit
+
       - name: Checkout code
         uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
         with:
           persist-credentials: false
       - name: Run stale_repos tool
-        uses: docker://ghcr.io/github-community-projects/stale_repos:v9
+        uses: docker://ghcr.io/github-community-projects/stale_repos:v9@sha256:374277cb9863651aeebd9a45f09083aaec013e72982d217bf4b058baa60bbc4a
         env:
           GH_TOKEN: ${{ secrets.GH_TOKEN }}
           ORGANIZATION: github
