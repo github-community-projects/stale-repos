@@ -10,11 +10,13 @@ on:
 env:
   TAG_NAME: ${{ github.event.inputs.TAG_NAME || github.ref}}
 permissions:
-  contents: write
+  contents: read
 jobs:
   update_tag:
     name: Update the major tag to include the ${{ github.event.inputs.TAG_NAME || github.ref }} changes
     runs-on: ubuntu-latest
+    permissions:
+      contents: write
     steps:
       - name: Harden the runner (Audit all outbound calls)
         uses: step-security/harden-runner@58077d3c7e43986b6b15fba718e8ea69e387dfcc # v2.15.1
