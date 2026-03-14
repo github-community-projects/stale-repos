@@ -4,12 +4,14 @@ on:
     - cron: "30 1 * * *"
 
 permissions:
-  issues: write
-  pull-requests: read
+  contents: read
 
 jobs:
   stale:
     runs-on: ubuntu-latest
+    permissions:
+      issues: write
+      pull-requests: read
     steps:
       - name: Harden the runner (Audit all outbound calls)
         uses: step-security/harden-runner@58077d3c7e43986b6b15fba718e8ea69e387dfcc # v2.15.1
