@@ -25,6 +25,6 @@ jobs:
       github.event.pull_request.draft == true
     steps:
       - name: Mark ready when ready
-        uses: kenyonj/mark-ready-when-ready@33b13c51ba23786efb933701ef253352baf05bdd # main (contents:write fix)
+        uses: kenyonj/mark-ready-when-ready@94be498c0f1b2f36c1b6ce22a1e94f8e9f57b3c1 # v1.1.1
         with:
           github-token: ${{ secrets.GITHUB_TOKEN }}
