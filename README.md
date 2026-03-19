@@ -113,7 +113,7 @@ jobs:
         uses: github-community-projects/stale-repos@v9
         env:
           GH_TOKEN: ${{ secrets.GH_TOKEN }}
-          ORGANIZATION: ${{ secrets.ORGANIZATION }}
+          ORGANIZATION: <GITHUB_ORGANIZATION_HERE>
           EXEMPT_TOPICS: "keep,template"
           INACTIVE_DAYS: 365
           ACTIVITY_METHOD: "pushed"
@@ -122,10 +122,12 @@ jobs:
       # This next step updates an existing issue. If you want a new issue every time, remove this step and remove the `issue-number: ${{ env.issue_number }}` line below.
       - name: Check for the stale report issue
         run: |
-          ISSUE_NUMBER=$(gh search issues "Stale-repository-report" --match title --json number --jq ".[0].number")
+          ISSUE_NUMBER=$(gh search issues "Stale-repository-report" --owner $ORG --repo $REPO --state open --match title --json number --jq ".[0].number")
           echo "issue_number=$ISSUE_NUMBER" >> "$GITHUB_ENV"
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          ORG: ${{ github.repository_owner }}
+          REPO: ${{ github.event.repository.name }}
 
       - name: Create issue
         uses: peter-evans/create-issue-from-file@v6
@@ -162,7 +164,7 @@ jobs:
         uses: github-community-projects/stale-repos@v9
         env:
           GH_TOKEN: ${{ secrets.GH_TOKEN }}
-          ORGANIZATION: ${{ secrets.ORGANIZATION }}
+          ORGANIZATION: <GITHUB_ORGANIZATION_HERE>
           EXEMPT_TOPICS: "keep,template"
           INACTIVE_DAYS: 365
           ADDITIONAL_METRICS: "release,pr"
@@ -211,7 +213,7 @@ jobs:
         uses: github-community-projects/stale-repos@v9
         env:
           GH_TOKEN: ${{ secrets.GH_TOKEN }}
-          ORGANIZATION: ${{ secrets.ORGANIZATION }}
+          ORGANIZATION: <GITHUB_ORGANIZATION_HERE>
           EXEMPT_TOPICS: "keep,template"
           INACTIVE_DAYS: 365
           ADDITIONAL_METRICS: "release,pr"
@@ -295,7 +297,7 @@ jobs:
           GH_APP_INSTALLATION_ID: ${{ secrets.GH_APP_INSTALLATION_ID }}
           GH_APP_PRIVATE_KEY: ${{ secrets.GH_APP_PRIVATE_KEY }}
           #GITHUB_APP_ENTERPRISE_ONLY: true --> Set this if the gh app was created in GHE and the endpoint is also a GHE instance
-          ORGANIZATION: ${{ secrets.ORGANIZATION }}
+          ORGANIZATION: <GITHUB_ORGANIZATION_HERE>
           EXEMPT_TOPICS: "keep,template"
           INACTIVE_DAYS: 365
           ACTIVITY_METHOD: "pushed"
