@@ -28,7 +28,7 @@ jobs:
         with:
           fetch-tags: true
           ref: ${{ github.event.inputs.TAG_NAME || github.ref }}
-          persist-credentials: false
+          persist-credentials: true
       - name: version
         id: version
         run: |

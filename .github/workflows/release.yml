@@ -52,6 +52,7 @@ jobs:
         with:
           fetch-tags: true
           ref: ${{ needs.release.outputs.full-tag }}
+          persist-credentials: true
 
       - name: Extract major version
         id: version
