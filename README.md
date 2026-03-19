@@ -113,7 +113,7 @@ jobs:
         uses: github-community-projects/stale-repos@v9
         env:
           GH_TOKEN: ${{ secrets.GH_TOKEN }}
-          ORGANIZATION: <GITHUB_ORGANIZATION_HERE>
+          ORGANIZATION: ${{ secrets.ORGANIZATION }}
           EXEMPT_TOPICS: "keep,template"
           INACTIVE_DAYS: 365
           ACTIVITY_METHOD: "pushed"
@@ -164,7 +164,7 @@ jobs:
         uses: github-community-projects/stale-repos@v9
         env:
           GH_TOKEN: ${{ secrets.GH_TOKEN }}
-          ORGANIZATION: <GITHUB_ORGANIZATION_HERE>
+          ORGANIZATION: ${{ secrets.ORGANIZATION }}
           EXEMPT_TOPICS: "keep,template"
           INACTIVE_DAYS: 365
           ADDITIONAL_METRICS: "release,pr"
@@ -213,7 +213,7 @@ jobs:
         uses: github-community-projects/stale-repos@v9
         env:
           GH_TOKEN: ${{ secrets.GH_TOKEN }}
-          ORGANIZATION: <GITHUB_ORGANIZATION_HERE>
+          ORGANIZATION: ${{ secrets.ORGANIZATION }}
           EXEMPT_TOPICS: "keep,template"
           INACTIVE_DAYS: 365
           ADDITIONAL_METRICS: "release,pr"
@@ -297,7 +297,7 @@ jobs:
           GH_APP_INSTALLATION_ID: ${{ secrets.GH_APP_INSTALLATION_ID }}
           GH_APP_PRIVATE_KEY: ${{ secrets.GH_APP_PRIVATE_KEY }}
           #GITHUB_APP_ENTERPRISE_ONLY: true --> Set this if the gh app was created in GHE and the endpoint is also a GHE instance
-          ORGANIZATION: <GITHUB_ORGANIZATION_HERE>
+          ORGANIZATION: ${{ secrets.ORGANIZATION }}
           EXEMPT_TOPICS: "keep,template"
           INACTIVE_DAYS: 365
           ACTIVITY_METHOD: "pushed"
