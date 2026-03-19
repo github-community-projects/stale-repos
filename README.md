@@ -122,10 +122,11 @@ jobs:
       # This next step updates an existing issue. If you want a new issue every time, remove this step and remove the `issue-number: ${{ env.issue_number }}` line below.
       - name: Check for the stale report issue
         run: |
-          ISSUE_NUMBER=$(gh search issues "Stale-repository-report" --match title --json number --jq ".[0].number")
+          ISSUE_NUMBER=$(gh search issues "Stale-repository-report" --repo $REPO_WITH_OWNER --state open --match title --json number --jq ".[0].number")
           echo "issue_number=$ISSUE_NUMBER" >> "$GITHUB_ENV"
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          REPO_WITH_OWNER: ${{ github.repository }}
 
       - name: Create issue
         uses: peter-evans/create-issue-from-file@v6
