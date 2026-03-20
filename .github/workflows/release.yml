@@ -35,6 +35,33 @@ jobs:
       image-registry: ghcr.io
       image-registry-username: ${{ github.actor }}
       image-registry-password: ${{ secrets.GITHUB_TOKEN }}
+  update_major_tag:
+    needs: release
+    if: ${{ needs.release.outputs.full-tag != '' }}
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - name: Harden the runner (Audit all outbound calls)
+        uses: step-security/harden-runner@fa2e9d605c4eeb9fcad4c99c224cee0c6c7f3594 # v2.16.0
+        with:
+          egress-policy: audit
+
+      - name: Checkout Repo
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          fetch-tags: true
+          ref: ${{ needs.release.outputs.full-tag }}
+          persist-credentials: true
+
+      - name: Force update major tag
+        run: |
+          git tag -f "${SHORT}" "${FULL}"
+          git push -f origin "${SHORT}"
+        env:
+          SHORT: ${{ needs.release.outputs.short-tag }}
+          FULL: ${{ needs.release.outputs.full-tag  }}
+
   release_discussion:
     needs: release
     permissions:
