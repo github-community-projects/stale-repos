@@ -54,23 +54,13 @@ jobs:
           ref: ${{ needs.release.outputs.full-tag }}
           persist-credentials: true
 
-      - name: Extract major version
-        id: version
-        run: |
-          tag="${FULL_TAG}"
-          version="${tag#v}"
-          major="${version%%.*}"
-          { echo "tag=${tag}"; echo "major=${major}"; } >> "$GITHUB_OUTPUT"
-        env:
-          FULL_TAG: ${{ needs.release.outputs.full-tag }}
-
       - name: Force update major tag
         run: |
-          git tag -f "v${MAJOR}" "${TAG}"
-          git push -f origin "v${MAJOR}"
+          git tag -f "${SHORT}" "${FULL}"
+          git push -f origin "${SHORT}"
         env:
-          MAJOR: ${{ steps.version.outputs.major }}
-          TAG: ${{ steps.version.outputs.tag }}
+          SHORT: ${{ needs.release.outputs.short-tag }}
+          FULL: ${{ needs.release.outputs.full-tag  }}
 
   release_discussion:
     needs: release
