@@ -5,6 +5,5 @@ rules:
       - pr-title.yml
       - release.yml
   secrets-outside-env:
-    config:
-      allow:
-        - GH_TOKEN
+    ignore:
+      - use-action.yml
