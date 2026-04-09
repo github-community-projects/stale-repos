@@ -6,4 +6,5 @@ rules:
       - release.yml
   secrets-outside-env:
     config:
-      - GH_TOKEN
+      allow:
+        - GH_TOKEN
