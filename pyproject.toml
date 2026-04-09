@@ -14,11 +14,11 @@ dev = [
     "black==26.3.1",
     "flake8==7.3.0",
     "isort==8.0.1",
-    "mypy==1.19.1",
+    "mypy==1.20.0",
     "mypy-extensions==1.1.0",
     "pylint==4.0.5",
     "pytest==9.0.2",
     "pytest-cov==7.1.0",
     "types-python-dateutil==2.9.0.20260323",
-    "types-requests==2.32.4.20260324",
+    "types-requests==2.33.0.20260327",
 ]
