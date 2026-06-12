@@ -77,6 +77,18 @@ class TestAuth(unittest.TestCase):
         )
         self.assertEqual(result, mock)
 
+    @patch("github3.login")
+    def test_auth_to_github_raises_when_connection_is_none(self, mock_login):
+        """
+        Test the auth_to_github function raises ValueError when github3.login returns None.
+        """
+        mock_login.return_value = None
+        with self.assertRaises(ValueError) as context_manager:
+            auth.auth_to_github("token", None, None, b"", "", False)
+        self.assertEqual(
+            str(context_manager.exception), "Unable to authenticate to GitHub"
+        )
+
 
 if __name__ == "__main__":
     unittest.main()

@@ -19,6 +19,7 @@ Example:
 import io
 import json
 import os
+import tempfile
 import unittest
 from datetime import datetime, timedelta, timezone
 from unittest.mock import MagicMock, call, patch
@@ -31,6 +32,7 @@ from stale_repos import (
     get_inactive_repos,
     is_repo_exempt,
     output_to_json,
+    set_repo_data,
 )
 
 
@@ -699,3 +701,226 @@ class TestAdditionalMetrics(unittest.TestCase):
             },
         ]
         self.assertEqual(inactive_repos, expected_inactive_repos)
+
+
+class GetInactiveReposWithExemptReposTestCase(unittest.TestCase):
+    """Verify get_inactive_repos honors the EXEMPT_REPOS environment variable."""
+
+    def setUp(self):
+        os.environ["EXEMPT_REPOS"] = "exempt_repo, another_exempt_repo"
+
+    def tearDown(self):
+        del os.environ["EXEMPT_REPOS"]
+
+    def test_exempt_repos_env_var_is_parsed_and_applied(self):
+        """EXEMPT_REPOS env var should exempt matching repos."""
+        mock_github = MagicMock()
+        mock_org = MagicMock()
+
+        forty_days_ago = datetime.now(timezone.utc) - timedelta(days=40)
+        exempt_repo = MagicMock(
+            html_url="https://github.com/example/exempt_repo",
+            pushed_at=forty_days_ago.isoformat(),
+            archived=False,
+            private=True,
+        )
+        exempt_repo.name = "exempt_repo"
+        exempt_repo.topics.return_value.names = []
+
+        included_repo = MagicMock(
+            html_url="https://github.com/example/included_repo",
+            pushed_at=forty_days_ago.isoformat(),
+            archived=False,
+            private=True,
+        )
+        included_repo.name = "included_repo"
+        included_repo.topics.return_value.names = []
+
+        mock_github.organization.return_value = mock_org
+        mock_org.repositories.return_value = [exempt_repo, included_repo]
+
+        with patch("sys.stdout", new_callable=io.StringIO) as mock_stdout:
+            inactive_repos = get_inactive_repos(mock_github, 30, "example")
+            output = mock_stdout.getvalue()
+
+        self.assertIn("Exempt repos: ['exempt_repo', 'another_exempt_repo']", output)
+        self.assertEqual(len(inactive_repos), 1)
+        self.assertEqual(
+            inactive_repos[0]["url"], "https://github.com/example/included_repo"
+        )
+
+
+class GetDaysSinceLastReleaseExceptionTestCase(unittest.TestCase):
+    """Cover the exception branches in get_days_since_last_release."""
+
+    def test_returns_none_on_type_error(self):
+        """A TypeError on the release iterator should return None and log a message."""
+        mock_repo = MagicMock(html_url="https://github.com/example/repo")
+        mock_repo.releases.return_value.__next__.side_effect = TypeError(
+            "ghost user release"
+        )
+
+        with patch("sys.stdout", new_callable=io.StringIO) as mock_stdout:
+            result = get_days_since_last_release(mock_repo)
+            output = mock_stdout.getvalue()
+
+        self.assertIsNone(result)
+        self.assertIn(
+            "https://github.com/example/repo had an exception trying to get the last release",
+            output,
+        )
+
+    def test_returns_none_when_no_releases(self):
+        """If the releases iterator is empty, return None without raising."""
+        mock_repo = MagicMock()
+        mock_repo.releases.return_value.__next__.side_effect = StopIteration
+
+        result = get_days_since_last_release(mock_repo)
+
+        self.assertIsNone(result)
+
+
+class GetDaysSinceLastPrExceptionTestCase(unittest.TestCase):
+    """Cover the exception branches in get_days_since_last_pr."""
+
+    def test_returns_none_when_no_pull_requests(self):
+        """If the pull_requests iterator is empty, return None without raising."""
+        mock_repo = MagicMock()
+        mock_repo.pull_requests.return_value.__next__.side_effect = StopIteration
+
+        result = get_days_since_last_pr(mock_repo)
+
+        self.assertIsNone(result)
+
+
+class GetActiveDateUnsupportedMethodTestCase(unittest.TestCase):
+    """Cover the ValueError branch in get_active_date when ACTIVITY_METHOD is bogus."""
+
+    @patch.dict(os.environ, {"ACTIVITY_METHOD": "not_a_real_method"})
+    def test_unsupported_activity_method_raises_value_error(self):
+        """Unsupported ACTIVITY_METHOD should raise ValueError (the raise sits
+        outside the github3 exception handler, so it propagates to the caller)."""
+        repo = MagicMock(html_url="https://github.com/example/repo")
+        with self.assertRaises(ValueError) as ctx:
+            get_active_date(repo)
+        self.assertIn(
+            "ACTIVITY_METHOD environment variable has unsupported value",
+            str(ctx.exception),
+        )
+
+
+class OutputToJsonOptionalKeysTestCase(unittest.TestCase):
+    """Cover the optional release/pr key branches in output_to_json."""
+
+    def test_includes_release_and_pr_keys_when_additional_metrics_set(self):
+        """When additional_metrics includes 'release' and 'pr', the JSON output
+        must include daysSinceLastRelease and daysSinceLastPR populated from the
+        production-shaped repo_data dict that set_repo_data emits."""
+        inactive_repos = [
+            {
+                "url": "https://github.com/example/repo",
+                "days_inactive": 40,
+                "last_push_date": "2024-01-01",
+                "visibility": "public",
+                "days_since_last_release": 5,
+                "days_since_last_pr": 2,
+            }
+        ]
+
+        result_json = output_to_json(
+            inactive_repos, MagicMock(), additional_metrics=["release", "pr"]
+        )
+        result = json.loads(result_json)
+
+        self.assertEqual(result[0]["daysSinceLastRelease"], 5)
+        self.assertEqual(result[0]["daysSinceLastPR"], 2)
+
+    def test_release_only_metric_omits_pr_field(self):
+        """Only the requested metric should appear in the JSON; the unrequested
+        one (pr) should be absent even if days_since_last_pr is in the dict."""
+        inactive_repos = [
+            {
+                "url": "https://github.com/example/repo",
+                "days_inactive": 40,
+                "last_push_date": "2024-01-01",
+                "visibility": "public",
+                "days_since_last_release": 5,
+                "days_since_last_pr": 2,
+            }
+        ]
+
+        result_json = output_to_json(
+            inactive_repos, MagicMock(), additional_metrics=["release"]
+        )
+        result = json.loads(result_json)
+
+        self.assertEqual(result[0]["daysSinceLastRelease"], 5)
+        self.assertNotIn("daysSinceLastPR", result[0])
+
+
+class OutputToJsonGithubOutputTestCase(unittest.TestCase):
+    """Cover the GITHUB_OUTPUT environment variable branch in output_to_json."""
+
+    def test_writes_to_github_output_when_env_var_set(self):
+        """When GITHUB_OUTPUT is set, output_to_json should append a
+        `inactiveRepos=` line to the file path it points at."""
+        inactive_repos = [
+            {
+                "url": "https://github.com/example/repo",
+                "days_inactive": 40,
+                "last_push_date": "2024-01-01",
+                "visibility": "public",
+            }
+        ]
+
+        with tempfile.NamedTemporaryFile(
+            mode="w", delete=False, suffix=".out"
+        ) as github_output_file:
+            github_output_path = github_output_file.name
+
+        try:
+            with patch.dict(os.environ, {"GITHUB_OUTPUT": github_output_path}):
+                output_to_json(inactive_repos, MagicMock())
+
+            with open(github_output_path, "r", encoding="utf-8") as handle:
+                contents = handle.read()
+            self.assertIn("inactiveRepos=", contents)
+            self.assertIn("https://github.com/example/repo", contents)
+        finally:
+            os.remove(github_output_path)
+
+
+class SetRepoDataGithubExceptionTestCase(unittest.TestCase):
+    """Cover the GitHubException branches in set_repo_data."""
+
+    def test_github_exception_on_release_is_logged(self):
+        """A GitHubException raised when fetching releases should be caught and
+        logged; days_since_last_release should stay None."""
+        repo = MagicMock(html_url="https://github.com/example/repo")
+        repo.releases.side_effect = github3.exceptions.GitHubException("release boom")
+
+        with patch("sys.stdout", new_callable=io.StringIO) as mock_stdout:
+            result = set_repo_data(repo, 10, "2024-01-01", "public", ["release"])
+            output = mock_stdout.getvalue()
+
+        self.assertIsNone(result["days_since_last_release"])
+        self.assertIn(
+            "https://github.com/example/repo had an exception trying to get the last release",
+            output,
+        )
+
+    def test_github_exception_on_pr_is_logged(self):
+        """A GitHubException raised when fetching PRs should be caught and
+        logged; days_since_last_pr should stay None."""
+        repo = MagicMock(html_url="https://github.com/example/repo")
+        repo.pull_requests.side_effect = github3.exceptions.GitHubException("pr boom")
+
+        with patch("sys.stdout", new_callable=io.StringIO) as mock_stdout:
+            result = set_repo_data(repo, 10, "2024-01-01", "public", ["pr"])
+            output = mock_stdout.getvalue()
+
+        self.assertIsNone(result["days_since_last_pr"])
+        self.assertIn(
+            "https://github.com/example/repo had an exception trying to get the last PR",
+            output,
+        )

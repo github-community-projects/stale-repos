@@ -73,7 +73,7 @@ def main():  # pragma: no cover
     )
 
     if inactive_repos or not skip_empty_reports:
-        output_to_json(inactive_repos)
+        output_to_json(inactive_repos, additional_metrics=additional_metrics)
         write_to_markdown(
             inactive_repos,
             inactive_days_threshold,
@@ -242,7 +242,7 @@ def get_active_date(repo):
     return active_date
 
 
-def output_to_json(inactive_repos, file=None):
+def output_to_json(inactive_repos, file=None, additional_metrics=None):
     """Convert the list of inactive repos to a json string.
 
     Args:
@@ -250,6 +250,12 @@ def output_to_json(inactive_repos, file=None):
             days inactive, the date of the last push,
             visibility of the repository (public/private),
             days since the last release, and days since the last pr.
+        file: An optional open file object to write the JSON to. If not
+            provided, a new file named "stale_repos.json" is opened.
+        additional_metrics: An optional list of additional metrics to include
+            in the JSON. Supported values: "release", "pr". When omitted, only
+            the core fields are emitted (matching the markdown writer's
+            behavior).
 
     Returns:
         JSON formatted string of the list of inactive repos.
@@ -273,10 +279,13 @@ def output_to_json(inactive_repos, file=None):
             "lastPushDate": repo_data["last_push_date"],
             "visibility": repo_data["visibility"],
         }
-        if "release" in repo_data:
-            repo_json["daysSinceLastRelease"] = repo_data["days_since_last_release"]
-        if "pr" in repo_data:
-            repo_json["daysSinceLastPR"] = repo_data["days_since_last_pr"]
+        if additional_metrics:
+            if "release" in additional_metrics:
+                repo_json["daysSinceLastRelease"] = repo_data.get(
+                    "days_since_last_release"
+                )
+            if "pr" in additional_metrics:
+                repo_json["daysSinceLastPR"] = repo_data.get("days_since_last_pr")
         inactive_repos_json.append(repo_json)
     inactive_repos_json = json.dumps(inactive_repos_json)
 
