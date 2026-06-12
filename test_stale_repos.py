@@ -812,28 +812,50 @@ class GetActiveDateUnsupportedMethodTestCase(unittest.TestCase):
 class OutputToJsonOptionalKeysTestCase(unittest.TestCase):
     """Cover the optional release/pr key branches in output_to_json."""
 
-    def test_includes_release_and_pr_keys_when_present(self):
-        """When repo_data dicts include 'release' and 'pr' marker keys, the JSON
-        output must include the additional daysSinceLastRelease and
-        daysSinceLastPR fields."""
+    def test_includes_release_and_pr_keys_when_additional_metrics_set(self):
+        """When additional_metrics includes 'release' and 'pr', the JSON output
+        must include daysSinceLastRelease and daysSinceLastPR populated from the
+        production-shaped repo_data dict that set_repo_data emits."""
         inactive_repos = [
             {
                 "url": "https://github.com/example/repo",
                 "days_inactive": 40,
                 "last_push_date": "2024-01-01",
                 "visibility": "public",
-                "release": True,
                 "days_since_last_release": 5,
-                "pr": True,
                 "days_since_last_pr": 2,
             }
         ]
 
-        result_json = output_to_json(inactive_repos, MagicMock())
+        result_json = output_to_json(
+            inactive_repos, MagicMock(), additional_metrics=["release", "pr"]
+        )
         result = json.loads(result_json)
 
         self.assertEqual(result[0]["daysSinceLastRelease"], 5)
         self.assertEqual(result[0]["daysSinceLastPR"], 2)
+
+    def test_release_only_metric_omits_pr_field(self):
+        """Only the requested metric should appear in the JSON; the unrequested
+        one (pr) should be absent even if days_since_last_pr is in the dict."""
+        inactive_repos = [
+            {
+                "url": "https://github.com/example/repo",
+                "days_inactive": 40,
+                "last_push_date": "2024-01-01",
+                "visibility": "public",
+                "days_since_last_release": 5,
+                "days_since_last_pr": 2,
+            }
+        ]
+
+        result_json = output_to_json(
+            inactive_repos, MagicMock(), additional_metrics=["release"]
+        )
+        result = json.loads(result_json)
+
+        self.assertEqual(result[0]["daysSinceLastRelease"], 5)
+        self.assertNotIn("daysSinceLastPR", result[0])
 
 
 class OutputToJsonGithubOutputTestCase(unittest.TestCase):
