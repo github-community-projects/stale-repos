@@ -195,6 +195,17 @@ class TestGetEnvVars(unittest.TestCase):
         result = get_env_vars(True)
         self.assertEqual(str(result), str(expected_result))
 
+    @patch.dict(
+        os.environ,
+        {"GH_TOKEN": "TOKEN"},
+        clear=True,
+    )
+    @patch("env.load_dotenv")
+    def test_get_env_vars_loads_dotenv_when_not_test(self, mock_load_dotenv):
+        """Test that get_env_vars loads the .env file when test is False."""
+        get_env_vars(test=False)
+        mock_load_dotenv.assert_called_once()
+
 
 if __name__ == "__main__":
     unittest.main()
