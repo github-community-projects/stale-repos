@@ -6,11 +6,10 @@ import json
 import os
 from datetime import datetime, timezone
 
-import github3
-from dateutil.parser import parse
-from env import get_env_vars
+from github import GithubException, UnknownObjectException
 
 import auth
+from env import get_env_vars
 from markdown import write_to_markdown
 
 
@@ -101,16 +100,13 @@ def is_repo_exempt(repo, exempt_repos, exempt_topics):
         print(f"{repo.html_url} is exempt from stale repo check")
         return True
     try:
-        if exempt_topics and any(
-            topic in exempt_topics for topic in repo.topics().names
-        ):
+        if exempt_topics and any(topic in exempt_topics for topic in repo.get_topics()):
             print(f"{repo.html_url} is exempt from stale repo check")
             return True
-    except github3.exceptions.NotFoundError as error_code:
-        if error_code.code == 404:
-            print(
-                f"{repo.html_url} does not have topics enabled and may be a private temporary fork"
-            )
+    except UnknownObjectException:
+        print(
+            f"{repo.html_url} does not have topics enabled and may be a private temporary fork"
+        )
 
     return False
 
@@ -134,9 +130,9 @@ def get_inactive_repos(
     """
     inactive_repos = []
     if organization:
-        repos = github_connection.organization(organization).repositories()
+        repos = github_connection.get_organization(organization).get_repos()
     else:
-        repos = github_connection.repositories(type="owner")
+        repos = github_connection.get_user().get_repos(type="owner")
 
     exempt_topics = os.getenv("EXEMPT_TOPICS")
     if exempt_topics:
@@ -185,7 +181,7 @@ def get_days_since_last_release(repo):
         The number of days since the last release.
     """
     try:
-        last_release = next(repo.releases())
+        last_release = next(iter(repo.get_releases()))
         return (datetime.now(timezone.utc) - last_release.created_at).days
     except TypeError:
         print(f"{repo.html_url} had an exception trying to get the last release.\
@@ -205,7 +201,7 @@ def get_days_since_last_pr(repo):
         The number of days since the last pull request was made.
     """
     try:
-        last_pr = next(repo.pull_requests(state="all"))
+        last_pr = next(iter(repo.get_pulls(state="all")))
         return (datetime.now(timezone.utc) - last_pr.created_at).days
     except StopIteration:
         return None
@@ -223,19 +219,18 @@ def get_active_date(repo):
     activity_method = os.getenv("ACTIVITY_METHOD", "pushed").lower()
     try:
         if activity_method == "default_branch_updated":
-            commit = repo.branch(repo.default_branch).commit
-            active_date = parse(commit.commit.as_dict()["committer"]["date"])
+            commit = repo.get_branch(repo.default_branch).commit
+            active_date = commit.commit.committer.date
         elif activity_method == "pushed":
-            last_push_str = repo.pushed_at  # type: ignore
-            if last_push_str is None:
+            active_date = repo.pushed_at
+            if active_date is None:
                 return None
-            active_date = parse(last_push_str)
         else:
             raise ValueError(f"""
                 ACTIVITY_METHOD environment variable has unsupported value: '{activity_method}'.
                 Allowed values are: 'pushed' and 'default_branch_updated'
                 """)
-    except github3.exceptions.GitHubException:
+    except GithubException:
         print(f"{repo.html_url} had an exception trying to get the activity date.\
  Potentially caused by ghost user.")
         return None
@@ -333,7 +328,7 @@ def set_repo_data(
         if "release" in additional_metrics:
             try:
                 repo_data["days_since_last_release"] = get_days_since_last_release(repo)
-            except github3.exceptions.GitHubException:
+            except GithubException:
                 print(
                     f"{repo.html_url} had an exception trying to get the last release.\
  Potentially caused by ghost user."
@@ -341,7 +336,7 @@ def set_repo_data(
         if "pr" in additional_metrics:
             try:
                 repo_data["days_since_last_pr"] = get_days_since_last_pr(repo)
-            except github3.exceptions.GitHubException:
+            except GithubException:
                 print(f"{repo.html_url} had an exception trying to get the last PR.\
  Potentially caused by ghost user.")
 

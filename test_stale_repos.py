@@ -24,7 +24,7 @@ import unittest
 from datetime import datetime, timedelta, timezone
 from unittest.mock import MagicMock, call, patch
 
-import github3.github
+from github import GithubException, UnknownObjectException
 from stale_repos import (
     get_active_date,
     get_days_since_last_pr,
@@ -82,29 +82,29 @@ class GetInactiveReposTestCase(unittest.TestCase):
         twenty_days_ago = datetime.now(timezone.utc) - timedelta(days=20)
         mock_repo1 = MagicMock(
             html_url="https://github.com/example/repo1",
-            pushed_at=twenty_days_ago.isoformat(),
+            pushed_at=twenty_days_ago,
             archived=False,
             private=True,
         )
-        mock_repo1.topics().names = []
+        mock_repo1.get_topics.return_value = []
         mock_repo2 = MagicMock(
             html_url="https://github.com/example/repo2",
-            pushed_at=forty_days_ago.isoformat(),
+            pushed_at=forty_days_ago,
             archived=False,
             private=True,
         )
-        mock_repo2.topics().names = []
+        mock_repo2.get_topics.return_value = []
         mock_repo3 = MagicMock(
             html_url="https://github.com/example/repo3",
-            pushed_at=forty_days_ago.isoformat(),
+            pushed_at=forty_days_ago,
             archived=True,
             private=True,
         )
-        mock_repo3.topics().names = []
+        mock_repo3.get_topics.return_value = []
 
         # Set up the MagicMock objects to return the expected values when called
-        mock_github.organization.return_value = mock_org
-        mock_org.repositories.return_value = [
+        mock_github.get_organization.return_value = mock_org
+        mock_org.get_repos.return_value = [
             mock_repo1,
             mock_repo2,
             mock_repo3,
@@ -141,7 +141,7 @@ class GetInactiveReposTestCase(unittest.TestCase):
         # Create a mock repository objects
         thirty_days_ago = datetime.now(timezone.utc) - timedelta(days=30)
         mock_repo1 = MagicMock(
-            pushed_at=thirty_days_ago.isoformat(),
+            pushed_at=thirty_days_ago,
             html_url="https://github.com/example/repo",
             archived=False,
         )
@@ -151,8 +151,8 @@ class GetInactiveReposTestCase(unittest.TestCase):
             archived=False,
         )
 
-        mock_github.organization.return_value = mock_org
-        mock_org.repositories.return_value = [
+        mock_github.get_organization.return_value = mock_org
+        mock_org.get_repos.return_value = [
             mock_repo1,
             mock_repo2,
         ]
@@ -180,21 +180,21 @@ class GetInactiveReposTestCase(unittest.TestCase):
         # create a mock repository with exempt topics
         thirty_days_ago = datetime.now(timezone.utc) - timedelta(days=30)
         mock_repo1 = MagicMock(
-            pushed_at=thirty_days_ago.isoformat(),
+            pushed_at=thirty_days_ago,
             html_url="https://github.com/example/repo",
             archived=False,
         )
-        mock_repo1.topics().names = ["topic1", "topic2"]
+        mock_repo1.get_topics.return_value = ["topic1", "topic2"]
 
         mock_repo2 = MagicMock(
-            pushed_at=thirty_days_ago.isoformat(),
+            pushed_at=thirty_days_ago,
             html_url="https://github.com/example/repo2",
             archived=False,
         )
-        mock_repo2.topics().names = ["topic3", "topic4"]
+        mock_repo2.get_topics.return_value = ["topic3", "topic4"]
 
-        mock_github.organization.return_value = mock_org
-        mock_org.repositories.return_value = [
+        mock_github.get_organization.return_value = mock_org
+        mock_org.get_repos.return_value = [
             mock_repo1,
             mock_repo2,
         ]
@@ -234,28 +234,28 @@ class GetInactiveReposTestCase(unittest.TestCase):
         twenty_days_ago = datetime.now(timezone.utc) - timedelta(days=20)
         mock_repo1 = MagicMock(
             html_url="https://github.com/example/repo1",
-            pushed_at=twenty_days_ago.isoformat(),
+            pushed_at=twenty_days_ago,
             archived=False,
             private=True,
         )
-        mock_repo1.topics().names = []
+        mock_repo1.get_topics.return_value = []
         mock_repo2 = MagicMock(
             html_url="https://github.com/example/repo2",
-            pushed_at=forty_days_ago.isoformat(),
+            pushed_at=forty_days_ago,
             archived=False,
             private=True,
         )
-        mock_repo2.topics().names = []
+        mock_repo2.get_topics.return_value = []
         mock_repo3 = MagicMock(
             html_url="https://github.com/example/repo3",
-            pushed_at=forty_days_ago.isoformat(),
+            pushed_at=forty_days_ago,
             archived=True,
             private=True,
         )
-        mock_repo3.topics().names = []
+        mock_repo3.get_topics.return_value = []
 
         # Set up the MagicMock objects to return the expected values when called
-        mock_github.repositories.return_value = [
+        mock_github.get_user.return_value.get_repos.return_value = [
             mock_repo1,
             mock_repo2,
             mock_repo3,
@@ -285,7 +285,7 @@ class GetInactiveReposTestCase(unittest.TestCase):
         This test uses a MagicMock object to simulate a GitHub API connection with a list
         of repositories with varying levels of inactivity. It then calls the get_inactive_repos
         function with the mock GitHub API connection, a threshold of 30 days, and the
-        default_branch_updated setting.  It mocks the branch method on the repo object to return
+        default_branch_updated setting.  It mocks the get_branch method on the repo object to return
         the necessary data for the active_date determination Finally, it checks that the function
         returns the expected list of inactive repos.
 
@@ -306,32 +306,28 @@ class GetInactiveReposTestCase(unittest.TestCase):
             archived=False,
             private=True,
         )
-        mock_repo1.topics().names = []
-        mock_repo1.branch().commit.commit.as_dict = MagicMock(
-            return_value={"committer": {"date": twenty_days_ago.isoformat()}}
+        mock_repo1.get_topics.return_value = []
+        mock_repo1.get_branch.return_value.commit.commit.committer.date = (
+            twenty_days_ago
         )
         mock_repo2 = MagicMock(
             html_url="https://github.com/example/repo2",
             archived=False,
             private=True,
         )
-        mock_repo2.topics().names = []
-        mock_repo2.branch().commit.commit.as_dict = MagicMock(
-            return_value={"committer": {"date": forty_days_ago.isoformat()}}
-        )
+        mock_repo2.get_topics.return_value = []
+        mock_repo2.get_branch.return_value.commit.commit.committer.date = forty_days_ago
         mock_repo3 = MagicMock(
             html_url="https://github.com/example/repo3",
             archived=True,
             private=True,
         )
-        mock_repo3.topics().names = []
-        mock_repo3.branch().commit.commit.as_dict = MagicMock(
-            return_value={"committer": {"date": forty_days_ago.isoformat()}}
-        )
+        mock_repo3.get_topics.return_value = []
+        mock_repo3.get_branch.return_value.commit.commit.committer.date = forty_days_ago
 
         # Set up the MagicMock objects to return the expected values when called
-        mock_github.organization.return_value = mock_org
-        mock_org.repositories.return_value = [
+        mock_github.get_organization.return_value = mock_org
+        mock_org.get_repos.return_value = [
             mock_repo1,
             mock_repo2,
             mock_repo3,
@@ -361,17 +357,17 @@ class GetActiveDateTestCase(unittest.TestCase):
     Unit test case for the get_active_date() function.
 
     This test case class verifies that get_active_date will return None if
-    github3 throws any kind of exception.
+    PyGithub throws any kind of exception.
     """
 
     def test_returns_none_for_exception(self):
-        """Test that get will return None if github3 throws any kind of exception."""
+        """Test that get will return None if PyGithub throws any kind of exception."""
         repo = MagicMock(
-            name="repo", default_branch="main", spec=["branch", "html_url"]
+            name="repo", default_branch="main", spec=["get_branch", "html_url"]
         )
 
-        repo.branch.side_effect = github3.exceptions.NotFoundError(
-            resp=MagicMock(status_code=404)
+        repo.get_branch.side_effect = UnknownObjectException(
+            404, {"message": "Not Found"}, None
         )
         result = get_active_date(repo)
 
@@ -546,9 +542,9 @@ class TestIsRepoExempt(unittest.TestCase):
         """
         Test that a repo is exempt if one of its topics is in the exempt_topics list.
         """
-        repo = MagicMock(name="repo", spec=["name", "html_url", "topics"])
+        repo = MagicMock(name="repo", spec=["name", "html_url", "get_topics"])
         repo.name = "not_exempt_repo"
-        repo.topics.return_value.names = ["exempt_topic"]
+        repo.get_topics.return_value = ["exempt_topic"]
         exempt_repos = []
         exempt_topics = ["exempt_topic"]
 
@@ -561,9 +557,9 @@ class TestIsRepoExempt(unittest.TestCase):
         Test that a repo is not exempt if it is not in the exempt_repos
         list and none of its topics are in the exempt_topics list.
         """
-        repo = MagicMock(name="repo", spec=["name", "html_url", "topics"])
+        repo = MagicMock(name="repo", spec=["name", "html_url", "get_topics"])
         repo.name = "not_exempt_repo"
-        repo.topics.return_value.names = ["not_exempt_topic"]
+        repo.get_topics.return_value = ["not_exempt_topic"]
         exempt_repos = ["exempt_repo"]
         exempt_topics = ["exempt_topic"]
 
@@ -573,13 +569,13 @@ class TestIsRepoExempt(unittest.TestCase):
 
     def test_not_found_error(self):
         """
-        Test that a repo is not exempt if a NotFoundError is raised
+        Test that a repo is not exempt if an UnknownObjectException is raised
         which happens for private temporary forks.
         """
-        repo = MagicMock(name="repo", spec=["name", "html_url", "topics"])
+        repo = MagicMock(name="repo", spec=["name", "html_url", "get_topics"])
         repo.name = "not_exempt_repo"
-        repo.topics.side_effect = github3.exceptions.NotFoundError(
-            resp=MagicMock(status_code=404)
+        repo.get_topics.side_effect = UnknownObjectException(
+            404, {"message": "Not Found"}, None
         )
         exempt_repos = []
         exempt_topics = ["exempt_topic"]
@@ -605,9 +601,8 @@ class TestAdditionalMetrics(unittest.TestCase):
         # Mock repository with a release date 10 days ago
         thirty_days_ago = datetime.now(timezone.utc) - timedelta(days=30)
         mock_repo = MagicMock()
-        mock_repo.releases.return_value.__next__.return_value.created_at = (
-            thirty_days_ago
-        )
+        mock_release = MagicMock(created_at=thirty_days_ago)
+        mock_repo.get_releases.return_value = iter([mock_release])
 
         # Calculate days since last release
         days_since_last_release = get_days_since_last_release(mock_repo)
@@ -622,9 +617,8 @@ class TestAdditionalMetrics(unittest.TestCase):
         # Mock repository with a PR date 20 days ago
         twenty_days_ago = datetime.now(timezone.utc) - timedelta(days=20)
         mock_repo = MagicMock()
-        mock_repo.pull_requests.return_value.__next__.return_value.created_at = (
-            twenty_days_ago
-        )
+        mock_pr = MagicMock(created_at=twenty_days_ago)
+        mock_repo.get_pulls.return_value = iter([mock_pr])
 
         # Calculate days since last PR
         days_since_last_pr = get_days_since_last_pr(mock_repo)
@@ -641,17 +635,17 @@ class TestAdditionalMetrics(unittest.TestCase):
         forty_days_ago = datetime.now(timezone.utc) - timedelta(days=40)
         mock_repo = MagicMock(
             html_url="https://github.com/example/repo",
-            pushed_at=forty_days_ago.isoformat(),
+            pushed_at=forty_days_ago,
             archived=False,
         )
-        mock_repo.releases.return_value.__next__.return_value.created_at = ten_days_ago
-        mock_repo.pull_requests.return_value.__next__.return_value.created_at = (
-            five_days_ago
-        )
+        mock_release = MagicMock(created_at=ten_days_ago)
+        mock_repo.get_releases.return_value = iter([mock_release])
+        mock_pr = MagicMock(created_at=five_days_ago)
+        mock_repo.get_pulls.return_value = iter([mock_pr])
 
         # Mock GitHub connection
         mock_github = MagicMock()
-        mock_github.organization.return_value.repositories.return_value = [mock_repo]
+        mock_github.get_organization.return_value.get_repos.return_value = [mock_repo]
 
         # Generate report with additional metrics configured
         inactive_repos = get_inactive_repos(
@@ -678,13 +672,13 @@ class TestAdditionalMetrics(unittest.TestCase):
         forty_days_ago = datetime.now(timezone.utc) - timedelta(days=40)
         mock_repo = MagicMock(
             html_url="https://github.com/example/repo",
-            pushed_at=forty_days_ago.isoformat(),
+            pushed_at=forty_days_ago,
             archived=False,
         )
 
         # Mock GitHub connection
         mock_github = MagicMock()
-        mock_github.organization.return_value.repositories.return_value = [mock_repo]
+        mock_github.get_organization.return_value.get_repos.return_value = [mock_repo]
 
         # Generate report without additional metrics configured
         inactive_repos = get_inactive_repos(mock_github, 30, "example", [])
@@ -720,24 +714,24 @@ class GetInactiveReposWithExemptReposTestCase(unittest.TestCase):
         forty_days_ago = datetime.now(timezone.utc) - timedelta(days=40)
         exempt_repo = MagicMock(
             html_url="https://github.com/example/exempt_repo",
-            pushed_at=forty_days_ago.isoformat(),
+            pushed_at=forty_days_ago,
             archived=False,
             private=True,
         )
         exempt_repo.name = "exempt_repo"
-        exempt_repo.topics.return_value.names = []
+        exempt_repo.get_topics.return_value = []
 
         included_repo = MagicMock(
             html_url="https://github.com/example/included_repo",
-            pushed_at=forty_days_ago.isoformat(),
+            pushed_at=forty_days_ago,
             archived=False,
             private=True,
         )
         included_repo.name = "included_repo"
-        included_repo.topics.return_value.names = []
+        included_repo.get_topics.return_value = []
 
-        mock_github.organization.return_value = mock_org
-        mock_org.repositories.return_value = [exempt_repo, included_repo]
+        mock_github.get_organization.return_value = mock_org
+        mock_org.get_repos.return_value = [exempt_repo, included_repo]
 
         with patch("sys.stdout", new_callable=io.StringIO) as mock_stdout:
             inactive_repos = get_inactive_repos(mock_github, 30, "example")
@@ -756,9 +750,8 @@ class GetDaysSinceLastReleaseExceptionTestCase(unittest.TestCase):
     def test_returns_none_on_type_error(self):
         """A TypeError on the release iterator should return None and log a message."""
         mock_repo = MagicMock(html_url="https://github.com/example/repo")
-        mock_repo.releases.return_value.__next__.side_effect = TypeError(
-            "ghost user release"
-        )
+        mock_repo.get_releases.return_value = iter([])
+        mock_repo.get_releases.side_effect = TypeError("ghost user release")
 
         with patch("sys.stdout", new_callable=io.StringIO) as mock_stdout:
             result = get_days_since_last_release(mock_repo)
@@ -773,7 +766,7 @@ class GetDaysSinceLastReleaseExceptionTestCase(unittest.TestCase):
     def test_returns_none_when_no_releases(self):
         """If the releases iterator is empty, return None without raising."""
         mock_repo = MagicMock()
-        mock_repo.releases.return_value.__next__.side_effect = StopIteration
+        mock_repo.get_releases.return_value = iter([])
 
         result = get_days_since_last_release(mock_repo)
 
@@ -784,9 +777,9 @@ class GetDaysSinceLastPrExceptionTestCase(unittest.TestCase):
     """Cover the exception branches in get_days_since_last_pr."""
 
     def test_returns_none_when_no_pull_requests(self):
-        """If the pull_requests iterator is empty, return None without raising."""
+        """If the get_pulls iterator is empty, return None without raising."""
         mock_repo = MagicMock()
-        mock_repo.pull_requests.return_value.__next__.side_effect = StopIteration
+        mock_repo.get_pulls.return_value = iter([])
 
         result = get_days_since_last_pr(mock_repo)
 
@@ -799,7 +792,7 @@ class GetActiveDateUnsupportedMethodTestCase(unittest.TestCase):
     @patch.dict(os.environ, {"ACTIVITY_METHOD": "not_a_real_method"})
     def test_unsupported_activity_method_raises_value_error(self):
         """Unsupported ACTIVITY_METHOD should raise ValueError (the raise sits
-        outside the github3 exception handler, so it propagates to the caller)."""
+        outside the GithubException handler, so it propagates to the caller)."""
         repo = MagicMock(html_url="https://github.com/example/repo")
         with self.assertRaises(ValueError) as ctx:
             get_active_date(repo)
@@ -891,13 +884,13 @@ class OutputToJsonGithubOutputTestCase(unittest.TestCase):
 
 
 class SetRepoDataGithubExceptionTestCase(unittest.TestCase):
-    """Cover the GitHubException branches in set_repo_data."""
+    """Cover the GithubException branches in set_repo_data."""
 
     def test_github_exception_on_release_is_logged(self):
-        """A GitHubException raised when fetching releases should be caught and
+        """A GithubException raised when fetching releases should be caught and
         logged; days_since_last_release should stay None."""
         repo = MagicMock(html_url="https://github.com/example/repo")
-        repo.releases.side_effect = github3.exceptions.GitHubException("release boom")
+        repo.get_releases.side_effect = GithubException(500, {"message": "error"}, None)
 
         with patch("sys.stdout", new_callable=io.StringIO) as mock_stdout:
             result = set_repo_data(repo, 10, "2024-01-01", "public", ["release"])
@@ -910,10 +903,10 @@ class SetRepoDataGithubExceptionTestCase(unittest.TestCase):
         )
 
     def test_github_exception_on_pr_is_logged(self):
-        """A GitHubException raised when fetching PRs should be caught and
+        """A GithubException raised when fetching PRs should be caught and
         logged; days_since_last_pr should stay None."""
         repo = MagicMock(html_url="https://github.com/example/repo")
-        repo.pull_requests.side_effect = github3.exceptions.GitHubException("pr boom")
+        repo.get_pulls.side_effect = GithubException(500, {"message": "error"}, None)
 
         with patch("sys.stdout", new_callable=io.StringIO) as mock_stdout:
             result = set_repo_data(repo, 10, "2024-01-01", "public", ["pr"])
