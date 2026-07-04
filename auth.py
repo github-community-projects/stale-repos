@@ -8,7 +8,7 @@ def auth_to_github(
     gh_app_id: int | None,
     gh_app_installation_id: int | None,
     gh_app_private_key_bytes: bytes,
-    ghe: str,
+    ghe: str | None,
     gh_app_enterprise_only: bool,
 ) -> Github:
     """

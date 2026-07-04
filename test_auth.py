@@ -21,7 +21,7 @@ class TestAuth(unittest.TestCase):
         mock_auth.Token.return_value = mock_token
         mock_github.return_value = "Authenticated to GitHub.com"
 
-        result = auth.auth_to_github("token", "", "", b"", "", False)
+        result = auth.auth_to_github("token", None, None, b"", None, False)
 
         mock_auth.Token.assert_called_once_with("token")
         mock_github.assert_called_once_with(auth=mock_token)
@@ -33,7 +33,7 @@ class TestAuth(unittest.TestCase):
         Expect a ValueError to be raised.
         """
         with self.assertRaises(ValueError) as context_manager:
-            auth.auth_to_github("", "", "", b"", "", False)
+            auth.auth_to_github("", None, None, b"", None, False)
         the_exception = context_manager.exception
         self.assertEqual(
             str(the_exception),
@@ -50,7 +50,7 @@ class TestAuth(unittest.TestCase):
         mock_auth.Token.return_value = mock_token
         mock_github.return_value = "Authenticated to GitHub Enterprise"
         result = auth.auth_to_github(
-            "token", "", "", b"", "https://github.example.com", False
+            "token", None, None, b"", "https://github.example.com", False
         )
 
         mock_auth.Token.assert_called_once_with("token")
