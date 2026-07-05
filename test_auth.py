@@ -104,22 +104,6 @@ class TestAuth(unittest.TestCase):
         mock_github.assert_called_once_with(auth=mock_installation_auth)
         self.assertEqual(result, mock_github.return_value)
 
-    @patch("auth.Github")
-    @patch("auth.Auth")
-    def test_auth_to_github_raises_when_connection_is_none(
-        self, mock_auth, mock_github
-    ):
-        """
-        Test the auth_to_github function raises ValueError when Github() returns None.
-        """
-        mock_auth.Token.return_value = MagicMock()
-        mock_github.return_value = None
-        with self.assertRaises(ValueError) as context_manager:
-            auth.auth_to_github("token", None, None, b"", "", False)
-        self.assertEqual(
-            str(context_manager.exception), "Unable to authenticate to GitHub"
-        )
-
 
 if __name__ == "__main__":
     unittest.main()

@@ -19,7 +19,7 @@ def auth_to_github(
         gh_app_id (int | None): the GitHub App ID
         gh_app_installation_id (int | None): the GitHub App Installation ID
         gh_app_private_key_bytes (bytes): the GitHub App Private Key
-        ghe (str): the GitHub Enterprise URL
+        ghe (str | None): the GitHub Enterprise URL, or None
         gh_app_enterprise_only (bool): Set this to true if the GH APP is created on GHE and needs to communicate with GHE api only
 
     Returns:
@@ -41,6 +41,4 @@ def auth_to_github(
             "GH_TOKEN or the set of [GH_APP_ID, GH_APP_INSTALLATION_ID, GH_APP_PRIVATE_KEY] environment variables are not set"
         )
 
-    if not github_connection:
-        raise ValueError("Unable to authenticate to GitHub")
     return github_connection

@@ -885,7 +885,7 @@ dev = [
 
 [package.metadata]
 requires-dist = [
-    { name = "pygithub", specifier = ">=2.6.0" },
+    { name = "pygithub", specifier = "==2.9.1" },
     { name = "python-dotenv", specifier = "==1.2.2" },
 ]
 
