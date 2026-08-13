@@ -83,6 +83,148 @@ def main():  # pragma: no cover
         print("Reporting skipped; no stale repos found.")
 
 
+def parse_custom_property_filters(raw):
+    """Parse a comma separated INCLUDE_CUSTOM_PROPERTIES value into filter tuples.
+
+    Args:
+        raw: The raw env var value, e.g. "owner=my-team,lifecycle".
+
+    Returns:
+        A list of (property_name, value) tuples. value is None for a bare
+        `name` entry (presence check), otherwise the lowercased string to
+        the right of the first `=` in a `name=value` entry.
+    """
+    filters = []
+    for token in raw.split(","):
+        token = token.strip()
+        if not token:
+            continue
+        name, sep, value = token.partition("=")
+        name = name.strip().lower()
+        filters.append((name, value.strip().lower() if sep else None))
+    return filters
+
+
+def matches_custom_properties(values, filters):
+    """Check whether a repo's custom property values satisfy every filter.
+
+    Args:
+        values: A dict of the repo's custom properties, as returned by the
+            GitHub API (property name -> string, list, or None).
+        filters: A list of (property_name, value) tuples as returned by
+            parse_custom_property_filters. All filters must match.
+
+    Returns:
+        True if every filter matches, False otherwise.
+    """
+    values_lower = {k.lower(): v for k, v in values.items()}
+    for name, wanted in filters:
+        actual = values_lower.get(name)
+        if not actual:
+            return False
+        if wanted is None:
+            continue
+        if isinstance(actual, list):
+            if not any(str(item).lower() == wanted for item in actual):
+                return False
+        elif str(actual).lower() != wanted:
+            return False
+    return True
+
+
+def get_custom_properties_map(github_connection, organization):
+    """Fetch custom property values for every repo in the organization.
+
+    Args:
+        github_connection: The GitHub connection object.
+        organization: The name of the organization, or None.
+
+    Returns:
+        A dict mapping lowercased repo name to its custom properties dict,
+        or None if custom properties can't be looked up in bulk (no
+        organization set), in which case callers should fall back to
+        get_repo_custom_properties() per repo.
+    """
+    if not organization:
+        print(
+            "INCLUDE_CUSTOM_PROPERTIES requires ORGANIZATION to be set; "
+            "falling back to per-repo lookups"
+        )
+        return None
+    try:
+        return {
+            item.repository_name.lower(): item.properties
+            for item in github_connection.get_organization(
+                organization
+            ).list_custom_property_values()
+        }
+    except GithubException:
+        print(
+            f"Unable to fetch custom properties for organization {organization}; "
+            "does the token have read:org access?"
+        )
+        return {}
+
+
+def get_repo_custom_properties(github_connection, repo):
+    """Fetch custom property values for a single repo.
+
+    Args:
+        github_connection: The GitHub connection object.
+        repo: A Github repository object.
+
+    Returns:
+        A dict mapping property name to its value (string, list, or None).
+    """
+    try:
+        _, data = github_connection.requester.requestJsonAndCheck(
+            "GET", f"{repo.url}/properties/values"
+        )
+        return {item["property_name"]: item["value"] for item in data}
+    except GithubException:
+        print(f"{repo.html_url} custom properties could not be retrieved")
+        return {}
+
+
+def resolve_custom_property_filter(github_connection, organization):
+    """Parse INCLUDE_CUSTOM_PROPERTIES and eagerly fetch matching values, if set.
+
+    Args:
+        github_connection: The GitHub connection object.
+        organization: The name of the organization, or None.
+
+    Returns:
+        A (filters, values_map) tuple, or None if INCLUDE_CUSTOM_PROPERTIES is
+        unset, in which case no custom properties API calls are made at all.
+    """
+    raw = os.getenv("INCLUDE_CUSTOM_PROPERTIES")
+    if not raw:
+        return None
+    filters = parse_custom_property_filters(raw)
+    print(f"Include custom properties: {filters}")
+    return filters, get_custom_properties_map(github_connection, organization)
+
+
+def repo_matches_custom_properties(github_connection, repo, filters, values_map):
+    """Check whether a repo satisfies the INCLUDE_CUSTOM_PROPERTIES filters.
+
+    Args:
+        github_connection: The GitHub connection object.
+        repo: A Github repository object.
+        filters: A list of (property_name, value) tuples.
+        values_map: The dict returned by get_custom_properties_map, or None
+            to fall back to a per-repo lookup.
+
+    Returns:
+        True if the repo's custom properties satisfy every filter.
+    """
+    if values_map is not None:
+        values = values_map.get(repo.name.lower(), {})
+    else:
+        values = get_repo_custom_properties(github_connection, repo)
+    return matches_custom_properties(values, filters)
+
+
 def is_repo_exempt(repo, exempt_repos, exempt_topics):
     """Check if a repo is exempt from the stale repo check.
 
@@ -144,9 +286,17 @@ def get_inactive_repos(
         exempt_repos = exempt_repos.replace(" ", "").split(",")
         print(f"Exempt repos: {exempt_repos}")
 
+    custom_property_filter = resolve_custom_property_filter(
+        github_connection, organization
+    )
+
     for repo in repos:
         # check if repo is exempt from stale repo check
         if repo.archived:
+            continue
+        if custom_property_filter and not repo_matches_custom_properties(
+            github_connection, repo, *custom_property_filter
+        ):
             continue
         if is_repo_exempt(repo, exempt_repos, exempt_topics):
             continue
