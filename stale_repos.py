@@ -93,6 +93,9 @@ def parse_custom_property_filters(raw):
         A list of (property_name, value) tuples. value is None for a bare
         `name` entry (presence check), otherwise the lowercased string to
         the right of the first `=` in a `name=value` entry.
+
+    Raises:
+        ValueError: If no entries are found or an entry has an empty name.
     """
     filters = []
     for token in raw.split(","):
@@ -101,7 +104,13 @@ def parse_custom_property_filters(raw):
             continue
         name, sep, value = token.partition("=")
         name = name.strip().lower()
+        if not name:
+            raise ValueError(
+                f"INCLUDE_CUSTOM_PROPERTIES entry {token!r} has an empty property name"
+            )
         filters.append((name, value.strip().lower() if sep else None))
+    if not filters:
+        raise ValueError("INCLUDE_CUSTOM_PROPERTIES contains no property filters")
     return filters
 
 
@@ -144,6 +153,9 @@ def get_custom_properties_map(github_connection, organization):
         or None if custom properties can't be looked up in bulk (no
         organization set), in which case callers should fall back to
         get_repo_custom_properties() per repo.
+
+    Raises:
+        GithubException: If the lookup fails.
     """
     if not organization:
         print(
@@ -163,7 +175,7 @@ def get_custom_properties_map(github_connection, organization):
             f"Unable to fetch custom properties for organization {organization}; "
             "does the token have read:org access?"
         )
-        return {}
+        raise
 
 
 def get_repo_custom_properties(github_connection, repo):
@@ -175,6 +187,9 @@ def get_repo_custom_properties(github_connection, repo):
 
     Returns:
         A dict mapping property name to its value (string, list, or None).
+
+    Raises:
+        GithubException: If the lookup fails.
     """
     try:
         _, data = github_connection.requester.requestJsonAndCheck(
@@ -183,7 +198,7 @@ def get_repo_custom_properties(github_connection, repo):
         return {item["property_name"]: item["value"] for item in data}
     except GithubException:
         print(f"{repo.html_url} custom properties could not be retrieved")
-        return {}
+        raise
 
 
 def resolve_custom_property_filter(github_connection, organization):

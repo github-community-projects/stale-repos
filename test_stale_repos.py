@@ -947,6 +947,14 @@ class ParseCustomPropertyFiltersTestCase(unittest.TestCase):
             with self.subTest(raw=raw):
                 self.assertEqual(parse_custom_property_filters(raw), expected)
 
+    def test_rejects_values_that_produce_no_valid_filter(self):
+        """Values with no filters or an empty property name must not silently
+        widen or empty the allow-list."""
+        for raw in [",", " , ", "=my-team", "owner,=x"]:
+            with self.subTest(raw=raw):
+                with self.assertRaises(ValueError):
+                    parse_custom_property_filters(raw)
+
 
 class MatchesCustomPropertiesTestCase(unittest.TestCase):
     """Test suite for the matches_custom_properties function."""
@@ -1005,19 +1013,16 @@ class GetCustomPropertiesMapTestCase(unittest.TestCase):
             },
         )
 
-    def test_returns_empty_dict_on_github_exception(self):
-        """A GithubException (e.g. missing read:org) should warn and return {}."""
+    def test_raises_on_github_exception(self):
+        """A GithubException (e.g. missing read:org) must abort the scan rather
+        than look like an org with no matching values."""
         mock_github = MagicMock()
         mock_github.get_organization.return_value.list_custom_property_values.side_effect = GithubException(
             403, {"message": "Forbidden"}, None
         )
 
-        with patch("sys.stdout", new_callable=io.StringIO) as mock_stdout:
-            result = get_custom_properties_map(mock_github, "example")
-            output = mock_stdout.getvalue()
-
-        self.assertEqual(result, {})
-        self.assertIn("Unable to fetch custom properties", output)
+        with self.assertRaises(GithubException):
+            get_custom_properties_map(mock_github, "example")
 
     def test_returns_none_without_organization(self):
         """Without an organization there is no bulk endpoint to call."""
@@ -1051,8 +1056,9 @@ class GetRepoCustomPropertiesTestCase(unittest.TestCase):
             "GET", "https://api.github.com/repos/example/repo/properties/values"
         )
 
-    def test_returns_empty_dict_on_github_exception(self):
-        """A GithubException should be caught and logged, returning {}."""
+    def test_raises_on_github_exception(self):
+        """A GithubException must propagate so the scan aborts instead of
+        treating the repo as having no properties."""
         mock_github = MagicMock()
         mock_github.requester.requestJsonAndCheck.side_effect = GithubException(
             404, {"message": "Not Found"}, None
@@ -1062,15 +1068,8 @@ class GetRepoCustomPropertiesTestCase(unittest.TestCase):
             html_url="https://github.com/example/repo",
         )
 
-        with patch("sys.stdout", new_callable=io.StringIO) as mock_stdout:
-            result = get_repo_custom_properties(mock_github, repo)
-            output = mock_stdout.getvalue()
-
-        self.assertEqual(result, {})
-        self.assertIn(
-            "https://github.com/example/repo custom properties could not be retrieved",
-            output,
-        )
+        with self.assertRaises(GithubException):
+            get_repo_custom_properties(mock_github, repo)
 
 
 class RepoMatchesCustomPropertiesTestCase(unittest.TestCase):
