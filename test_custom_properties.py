@@ -6,13 +6,10 @@ import unittest
 from datetime import datetime, timedelta, timezone
 from unittest.mock import MagicMock, patch
 
-from github import GithubException
 from stale_repos import (
-    get_custom_properties_map,
     get_inactive_repos,
     matches_custom_properties,
     parse_custom_property_filters,
-    repo_matches_custom_properties,
     resolve_custom_property_filter,
 )
 
@@ -78,109 +75,28 @@ class MatchesCustomPropertiesTestCase(unittest.TestCase):
         self.assertFalse(matches_custom_properties(values, filters))
 
 
-class GetCustomPropertiesMapTestCase(unittest.TestCase):
-    """Test suite for the get_custom_properties_map function."""
-
-    def test_builds_lowercased_map_from_org(self):
-        """The map should be keyed by lowercased repo name."""
-        mock_github = MagicMock()
-        item1 = MagicMock(spec=["repository_name", "properties"])
-        item1.repository_name = "Repo-One"
-        item1.properties = {"owner": "my-team"}
-        item2 = MagicMock(spec=["repository_name", "properties"])
-        item2.repository_name = "repo-two"
-        item2.properties = {"owner": "other-team"}
-        mock_github.get_organization.return_value.list_custom_property_values.return_value = [
-            item1,
-            item2,
-        ]
-
-        result = get_custom_properties_map(mock_github, "example")
-
-        self.assertEqual(
-            result,
-            {
-                "repo-one": {"owner": "my-team"},
-                "repo-two": {"owner": "other-team"},
-            },
-        )
-
-    def test_raises_on_github_exception(self):
-        """A GithubException (e.g. missing read:org) must abort the scan rather
-        than look like an org with no matching values."""
-        mock_github = MagicMock()
-        mock_github.get_organization.return_value.list_custom_property_values.side_effect = GithubException(
-            403, {"message": "Forbidden"}, None
-        )
-
-        with self.assertRaises(GithubException):
-            get_custom_properties_map(mock_github, "example")
-
-    def test_raises_without_organization(self):
-        """Per-repo properties don't exist for user-owned repos, so fail fast."""
-        mock_github = MagicMock()
-
-        with self.assertRaisesRegex(ValueError, "requires ORGANIZATION"):
-            get_custom_properties_map(mock_github, None)
-
-        mock_github.get_organization.assert_not_called()
-
-
-class RepoMatchesCustomPropertiesTestCase(unittest.TestCase):
-    """Test suite for the repo_matches_custom_properties function."""
-
-    def test_looks_repo_up_by_lowercased_name(self):
-        """The repo is matched against the bulk map by lowercased name."""
-        repo = MagicMock(name="repo", spec=["name"])
-        repo.name = "Repo-One"
-        values_map = {"repo-one": {"owner": "my-team"}}
-
-        result = repo_matches_custom_properties(
-            repo, [("owner", "my-team")], values_map
-        )
-
-        self.assertTrue(result)
-
-    def test_repo_absent_from_values_map_does_not_match(self):
-        """A repo missing from the bulk map (e.g. newly created) should not match."""
-        repo = MagicMock(name="repo", spec=["name"])
-        repo.name = "unlisted-repo"
-        values_map = {"repo-one": {"owner": "my-team"}}
-
-        result = repo_matches_custom_properties(
-            repo, [("owner", "my-team")], values_map
-        )
-
-        self.assertFalse(result)
-
-
 class ResolveCustomPropertyFilterTestCase(unittest.TestCase):
     """Test suite for the resolve_custom_property_filter function."""
 
     def test_returns_none_when_env_var_unset(self):
-        """Without INCLUDE_CUSTOM_PROPERTIES set, no API calls should be made."""
-        mock_github = MagicMock()
-
-        result = resolve_custom_property_filter(mock_github, "example")
-
-        self.assertIsNone(result)
-        mock_github.get_organization.assert_not_called()
+        """Without INCLUDE_CUSTOM_PROPERTIES set, no filtering happens."""
+        self.assertIsNone(resolve_custom_property_filter("example"))
 
     @patch.dict(os.environ, {"INCLUDE_CUSTOM_PROPERTIES": "owner=my-team"})
-    def test_returns_filters_and_values_map_when_set(self):
-        """With the env var set, it should parse the filters, print them, and
-        fetch the values map for the given organization."""
-        mock_github = MagicMock()
-        mock_github.get_organization.return_value.list_custom_property_values.return_value = (
-            []
-        )
-
+    def test_returns_parsed_filters_and_prints_them(self):
+        """The parsed filters are returned and echoed to the log."""
         with patch("sys.stdout", new_callable=io.StringIO) as mock_stdout:
-            result = resolve_custom_property_filter(mock_github, "example")
+            result = resolve_custom_property_filter("example")
             output = mock_stdout.getvalue()
 
-        self.assertEqual(result, ([("owner", "my-team")], {}))
+        self.assertEqual(result, [("owner", "my-team")])
         self.assertIn("Include custom properties: [('owner', 'my-team')]", output)
+
+    @patch.dict(os.environ, {"INCLUDE_CUSTOM_PROPERTIES": "owner=my-team"})
+    def test_raises_without_organization(self):
+        """Custom properties only exist for org-owned repos, so fail fast."""
+        with self.assertRaisesRegex(ValueError, "requires ORGANIZATION"):
+            resolve_custom_property_filter(None)
 
 
 class GetInactiveReposWithIncludeCustomPropertiesTestCase(unittest.TestCase):
@@ -206,6 +122,7 @@ class GetInactiveReposWithIncludeCustomPropertiesTestCase(unittest.TestCase):
             private=True,
         )
         matching_repo.name = "matching_repo"
+        matching_repo.custom_properties = {"owner": "my-team"}
         matching_repo.get_topics.return_value = []
 
         non_matching_repo = MagicMock(
@@ -215,19 +132,10 @@ class GetInactiveReposWithIncludeCustomPropertiesTestCase(unittest.TestCase):
             private=True,
         )
         non_matching_repo.name = "non_matching_repo"
+        non_matching_repo.custom_properties = {"owner": "other-team"}
 
         mock_github.get_organization.return_value = mock_org
         mock_org.get_repos.return_value = [matching_repo, non_matching_repo]
-        mock_org.list_custom_property_values.return_value = [
-            MagicMock(
-                repository_name="matching_repo",
-                properties={"owner": "my-team"},
-            ),
-            MagicMock(
-                repository_name="non_matching_repo",
-                properties={"owner": "other-team"},
-            ),
-        ]
 
         with patch("sys.stdout", new_callable=io.StringIO) as mock_stdout:
             inactive_repos = get_inactive_repos(mock_github, 30, "example")

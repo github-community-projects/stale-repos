@@ -141,69 +141,28 @@ def matches_custom_properties(values, filters):
     return True
 
 
-def get_custom_properties_map(github_connection, organization):
-    """Fetch custom property values for every repo in the organization.
+def resolve_custom_property_filter(organization):
+    """Parse INCLUDE_CUSTOM_PROPERTIES, if set.
 
     Args:
-        github_connection: The GitHub connection object.
-        organization: The name of the organization.
-
-    Returns:
-        A dict mapping lowercased repo name to its custom properties dict.
-
-    Raises:
-        ValueError: If no organization is set; custom properties only exist
-            for organization-owned repos.
-        GithubException: If the lookup fails.
-    """
-    if not organization:
-        raise ValueError("INCLUDE_CUSTOM_PROPERTIES requires ORGANIZATION to be set")
-    try:
-        return {
-            item.repository_name.lower(): item.properties
-            for item in github_connection.get_organization(
-                organization
-            ).list_custom_property_values()
-        }
-    except GithubException:
-        print(
-            f"Unable to fetch custom properties for organization {organization}; "
-            "does the token have read:org access?"
-        )
-        raise
-
-
-def resolve_custom_property_filter(github_connection, organization):
-    """Parse INCLUDE_CUSTOM_PROPERTIES and eagerly fetch matching values, if set.
-
-    Args:
-        github_connection: The GitHub connection object.
         organization: The name of the organization, or None.
 
     Returns:
-        A (filters, values_map) tuple, or None if INCLUDE_CUSTOM_PROPERTIES is
-        unset, in which case no custom properties API calls are made at all.
+        A list of (property_name, value) tuples, or None if
+        INCLUDE_CUSTOM_PROPERTIES is unset.
+
+    Raises:
+        ValueError: If the filter is invalid, or no organization is set;
+            custom properties only exist for organization-owned repos.
     """
     raw = os.getenv("INCLUDE_CUSTOM_PROPERTIES")
     if not raw:
         return None
+    if not organization:
+        raise ValueError("INCLUDE_CUSTOM_PROPERTIES requires ORGANIZATION to be set")
     filters = parse_custom_property_filters(raw)
     print(f"Include custom properties: {filters}")
-    return filters, get_custom_properties_map(github_connection, organization)
-
-
-def repo_matches_custom_properties(repo, filters, values_map):
-    """Check whether a repo satisfies the INCLUDE_CUSTOM_PROPERTIES filters.
-
-    Args:
-        repo: A Github repository object.
-        filters: A list of (property_name, value) tuples.
-        values_map: The dict returned by get_custom_properties_map.
-
-    Returns:
-        True if the repo's custom properties satisfy every filter.
-    """
-    return matches_custom_properties(values_map.get(repo.name.lower(), {}), filters)
+    return filters
 
 
 def is_repo_exempt(repo, exempt_repos, exempt_topics):
@@ -267,16 +226,14 @@ def get_inactive_repos(
         exempt_repos = exempt_repos.replace(" ", "").split(",")
         print(f"Exempt repos: {exempt_repos}")
 
-    custom_property_filter = resolve_custom_property_filter(
-        github_connection, organization
-    )
+    custom_property_filters = resolve_custom_property_filter(organization)
 
     for repo in repos:
         # check if repo is exempt from stale repo check
         if repo.archived:
             continue
-        if custom_property_filter and not repo_matches_custom_properties(
-            repo, *custom_property_filter
+        if custom_property_filters and not matches_custom_properties(
+            repo.custom_properties, custom_property_filters
         ):
             continue
         if is_repo_exempt(repo, exempt_repos, exempt_topics):
