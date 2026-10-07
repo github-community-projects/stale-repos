@@ -10,7 +10,6 @@ from github import GithubException
 from stale_repos import (
     get_custom_properties_map,
     get_inactive_repos,
-    get_repo_custom_properties,
     matches_custom_properties,
     parse_custom_property_filters,
     repo_matches_custom_properties,
@@ -117,103 +116,42 @@ class GetCustomPropertiesMapTestCase(unittest.TestCase):
         with self.assertRaises(GithubException):
             get_custom_properties_map(mock_github, "example")
 
-    def test_returns_none_without_organization(self):
-        """Without an organization there is no bulk endpoint to call."""
+    def test_raises_without_organization(self):
+        """Per-repo properties don't exist for user-owned repos, so fail fast."""
         mock_github = MagicMock()
 
-        with patch("sys.stdout", new_callable=io.StringIO) as mock_stdout:
-            result = get_custom_properties_map(mock_github, None)
-            output = mock_stdout.getvalue()
+        with self.assertRaisesRegex(ValueError, "requires ORGANIZATION"):
+            get_custom_properties_map(mock_github, None)
 
-        self.assertIsNone(result)
-        self.assertIn("INCLUDE_CUSTOM_PROPERTIES requires ORGANIZATION", output)
-
-
-class GetRepoCustomPropertiesTestCase(unittest.TestCase):
-    """Test suite for the get_repo_custom_properties function."""
-
-    def test_flattens_property_list_into_dict(self):
-        """The per-repo endpoint returns a list of {property_name, value}
-        objects; these should be flattened into a plain dict."""
-        mock_github = MagicMock()
-        mock_github.requester.requestJsonAndCheck.return_value = (
-            {},
-            [{"property_name": "Lifecycle", "value": "maintenance"}],
-        )
-        repo = MagicMock(url="https://api.github.com/repos/example/repo")
-
-        result = get_repo_custom_properties(mock_github, repo)
-
-        self.assertEqual(result, {"Lifecycle": "maintenance"})
-        mock_github.requester.requestJsonAndCheck.assert_called_once_with(
-            "GET", "https://api.github.com/repos/example/repo/properties/values"
-        )
-
-    def test_raises_on_github_exception(self):
-        """A GithubException must propagate so the scan aborts instead of
-        treating the repo as having no properties."""
-        mock_github = MagicMock()
-        mock_github.requester.requestJsonAndCheck.side_effect = GithubException(
-            404, {"message": "Not Found"}, None
-        )
-        repo = MagicMock(
-            url="https://api.github.com/repos/example/repo",
-            html_url="https://github.com/example/repo",
-        )
-
-        with self.assertRaises(GithubException):
-            get_repo_custom_properties(mock_github, repo)
+        mock_github.get_organization.assert_not_called()
 
 
 class RepoMatchesCustomPropertiesTestCase(unittest.TestCase):
     """Test suite for the repo_matches_custom_properties function."""
 
-    def test_uses_values_map_when_present(self):
-        """When a values_map is supplied, look the repo up by name in it
-        rather than making a per-repo API call."""
-        mock_github = MagicMock()
+    def test_looks_repo_up_by_lowercased_name(self):
+        """The repo is matched against the bulk map by lowercased name."""
         repo = MagicMock(name="repo", spec=["name"])
         repo.name = "Repo-One"
         values_map = {"repo-one": {"owner": "my-team"}}
 
         result = repo_matches_custom_properties(
-            mock_github, repo, [("owner", "my-team")], values_map
+            repo, [("owner", "my-team")], values_map
         )
 
         self.assertTrue(result)
-        mock_github.requester.requestJsonAndCheck.assert_not_called()
 
     def test_repo_absent_from_values_map_does_not_match(self):
         """A repo missing from the bulk map (e.g. newly created) should not match."""
-        mock_github = MagicMock()
         repo = MagicMock(name="repo", spec=["name"])
         repo.name = "unlisted-repo"
         values_map = {"repo-one": {"owner": "my-team"}}
 
         result = repo_matches_custom_properties(
-            mock_github, repo, [("owner", "my-team")], values_map
+            repo, [("owner", "my-team")], values_map
         )
 
         self.assertFalse(result)
-
-    def test_falls_back_to_per_repo_lookup_when_map_is_none(self):
-        """A None values_map should route to the per-repo API call."""
-        mock_github = MagicMock()
-        mock_github.requester.requestJsonAndCheck.return_value = (
-            {},
-            [{"property_name": "owner", "value": "my-team"}],
-        )
-        repo = MagicMock(
-            name="repo", spec=["name", "url"], url="https://api.github.com/repos/x/repo"
-        )
-        repo.name = "repo"
-
-        result = repo_matches_custom_properties(
-            mock_github, repo, [("owner", "my-team")], None
-        )
-
-        self.assertTrue(result)
-        mock_github.requester.requestJsonAndCheck.assert_called_once()
 
 
 class ResolveCustomPropertyFilterTestCase(unittest.TestCase):

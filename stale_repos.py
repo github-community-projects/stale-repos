@@ -146,23 +146,18 @@ def get_custom_properties_map(github_connection, organization):
 
     Args:
         github_connection: The GitHub connection object.
-        organization: The name of the organization, or None.
+        organization: The name of the organization.
 
     Returns:
-        A dict mapping lowercased repo name to its custom properties dict,
-        or None if custom properties can't be looked up in bulk (no
-        organization set), in which case callers should fall back to
-        get_repo_custom_properties() per repo.
+        A dict mapping lowercased repo name to its custom properties dict.
 
     Raises:
+        ValueError: If no organization is set; custom properties only exist
+            for organization-owned repos.
         GithubException: If the lookup fails.
     """
     if not organization:
-        print(
-            "INCLUDE_CUSTOM_PROPERTIES requires ORGANIZATION to be set; "
-            "falling back to per-repo lookups"
-        )
-        return None
+        raise ValueError("INCLUDE_CUSTOM_PROPERTIES requires ORGANIZATION to be set")
     try:
         return {
             item.repository_name.lower(): item.properties
@@ -175,29 +170,6 @@ def get_custom_properties_map(github_connection, organization):
             f"Unable to fetch custom properties for organization {organization}; "
             "does the token have read:org access?"
         )
-        raise
-
-
-def get_repo_custom_properties(github_connection, repo):
-    """Fetch custom property values for a single repo.
-
-    Args:
-        github_connection: The GitHub connection object.
-        repo: A Github repository object.
-
-    Returns:
-        A dict mapping property name to its value (string, list, or None).
-
-    Raises:
-        GithubException: If the lookup fails.
-    """
-    try:
-        _, data = github_connection.requester.requestJsonAndCheck(
-            "GET", f"{repo.url}/properties/values"
-        )
-        return {item["property_name"]: item["value"] for item in data}
-    except GithubException:
-        print(f"{repo.html_url} custom properties could not be retrieved")
         raise
 
 
@@ -220,24 +192,18 @@ def resolve_custom_property_filter(github_connection, organization):
     return filters, get_custom_properties_map(github_connection, organization)
 
 
-def repo_matches_custom_properties(github_connection, repo, filters, values_map):
+def repo_matches_custom_properties(repo, filters, values_map):
     """Check whether a repo satisfies the INCLUDE_CUSTOM_PROPERTIES filters.
 
     Args:
-        github_connection: The GitHub connection object.
         repo: A Github repository object.
         filters: A list of (property_name, value) tuples.
-        values_map: The dict returned by get_custom_properties_map, or None
-            to fall back to a per-repo lookup.
+        values_map: The dict returned by get_custom_properties_map.
 
     Returns:
         True if the repo's custom properties satisfy every filter.
     """
-    if values_map is not None:
-        values = values_map.get(repo.name.lower(), {})
-    else:
-        values = get_repo_custom_properties(github_connection, repo)
-    return matches_custom_properties(values, filters)
+    return matches_custom_properties(values_map.get(repo.name.lower(), {}), filters)
 
 
 def is_repo_exempt(repo, exempt_repos, exempt_topics):
@@ -310,7 +276,7 @@ def get_inactive_repos(
         if repo.archived:
             continue
         if custom_property_filter and not repo_matches_custom_properties(
-            github_connection, repo, *custom_property_filter
+            repo, *custom_property_filter
         ):
             continue
         if is_repo_exempt(repo, exempt_repos, exempt_topics):
