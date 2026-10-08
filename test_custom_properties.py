@@ -40,9 +40,8 @@ class ParseCustomPropertyFiltersTestCase(unittest.TestCase):
         """Values with no filters or an empty property name must not silently
         widen or empty the allow-list."""
         for raw in [",", " , ", "=my-team", "owner,=x"]:
-            with self.subTest(raw=raw):
-                with self.assertRaises(ValueError):
-                    parse_custom_property_filters(raw)
+            with self.subTest(raw=raw), self.assertRaises(ValueError):
+                parse_custom_property_filters(raw)
 
 
 class MatchesCustomPropertiesTestCase(unittest.TestCase):

@@ -25,6 +25,7 @@ from datetime import datetime, timedelta, timezone
 from unittest.mock import MagicMock, call, patch
 
 from github import GithubException, UnknownObjectException
+
 from stale_repos import (
     get_active_date,
     get_days_since_last_pr,
