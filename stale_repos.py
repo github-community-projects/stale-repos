@@ -83,6 +83,88 @@ def main():  # pragma: no cover
         print("Reporting skipped; no stale repos found.")
 
 
+def parse_custom_property_filters(raw):
+    """Parse a comma separated INCLUDE_CUSTOM_PROPERTIES value into filter tuples.
+
+    Args:
+        raw: The raw env var value, e.g. "owner=my-team,lifecycle".
+
+    Returns:
+        A list of (property_name, value) tuples. value is None for a bare
+        `name` entry (presence check), otherwise the lowercased string to
+        the right of the first `=` in a `name=value` entry.
+
+    Raises:
+        ValueError: If no entries are found or an entry has an empty name.
+    """
+    filters = []
+    for token in raw.split(","):
+        token = token.strip()
+        if not token:
+            continue
+        name, sep, value = token.partition("=")
+        name = name.strip().lower()
+        if not name:
+            raise ValueError(
+                f"INCLUDE_CUSTOM_PROPERTIES entry {token!r} has an empty property name"
+            )
+        filters.append((name, value.strip().lower() if sep else None))
+    if not filters:
+        raise ValueError("INCLUDE_CUSTOM_PROPERTIES contains no property filters")
+    return filters
+
+
+def matches_custom_properties(values, filters):
+    """Check whether a repo's custom property values satisfy every filter.
+
+    Args:
+        values: A dict of the repo's custom properties, as returned by the
+            GitHub API (property name -> string, list, or None).
+        filters: A list of (property_name, value) tuples as returned by
+            parse_custom_property_filters. All filters must match.
+
+    Returns:
+        True if every filter matches, False otherwise.
+    """
+    values_lower = {k.lower(): v for k, v in values.items()}
+    for name, wanted in filters:
+        actual = values_lower.get(name)
+        if not actual:
+            return False
+        if wanted is None:
+            continue
+        if isinstance(actual, list):
+            if not any(str(item).lower() == wanted for item in actual):
+                return False
+        elif str(actual).lower() != wanted:
+            return False
+    return True
+
+
+def resolve_custom_property_filter(organization):
+    """Parse INCLUDE_CUSTOM_PROPERTIES, if set.
+
+    Args:
+        organization: The name of the organization, or None.
+
+    Returns:
+        A list of (property_name, value) tuples, or None if
+        INCLUDE_CUSTOM_PROPERTIES is unset.
+
+    Raises:
+        ValueError: If the filter is invalid, or no organization is set;
+            custom properties only exist for organization-owned repos.
+    """
+    raw = os.getenv("INCLUDE_CUSTOM_PROPERTIES")
+    if not raw:
+        return None
+    if not organization:
+        raise ValueError("INCLUDE_CUSTOM_PROPERTIES requires ORGANIZATION to be set")
+    filters = parse_custom_property_filters(raw)
+    print(f"Include custom properties: {filters}")
+    return filters
+
+
 def is_repo_exempt(repo, exempt_repos, exempt_topics):
     """Check if a repo is exempt from the stale repo check.
 
@@ -144,9 +226,15 @@ def get_inactive_repos(
         exempt_repos = exempt_repos.replace(" ", "").split(",")
         print(f"Exempt repos: {exempt_repos}")
 
+    custom_property_filters = resolve_custom_property_filter(organization)
+
     for repo in repos:
         # check if repo is exempt from stale repo check
         if repo.archived:
+            continue
+        if custom_property_filters and not matches_custom_properties(
+            repo.custom_properties, custom_property_filters
+        ):
             continue
         if is_repo_exempt(repo, exempt_repos, exempt_topics):
             continue
