@@ -84,6 +84,6 @@ We are using [Conventional Commits](https://www.conventionalcommits.org/en/v1.0.
 
 ## Releases
 
-Releases are automated if a pull request is labelled with our [SemVer related labels](.github/release-drafter.yml) or with the `vuln` or `release` labels.
+Releases are automated only when a merged pull request has the `release` label. The version bump comes from the [SemVer related labels](.github/release-drafter.yml) on all pull requests merged since the last release, so a `feature` pull request merged earlier still makes the next release a minor bump.
 
 You can also manually initiate a release through the GitHub Actions UI. If you have permissions to do so, you can navigate to the [Actions tab](https://github.com/github-community-projects/stale-repos/actions/workflows/release.yml) and select the `Run workflow` button. This will allow you to select the branch to release from and the version to release.
