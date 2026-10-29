@@ -21,7 +21,7 @@ jobs:
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        python-version: [3.11, 3.12, 3.13, 3.14]
+        python-version: ["3.11", "3.12", "3.13", "3.14", "3.15"]
     steps:
       - name: Harden the runner (Audit all outbound calls)
         uses: step-security/harden-runner@dc2769abcc0fcfbadfc1df54081c1608579ef6b2 # v2.22.2
@@ -41,6 +41,8 @@ jobs:
       - name: Install dependencies
         run: uv sync --frozen --python ${{ matrix.python-version }}
       - name: Lint with flake8 and pylint
+        # pyflakes 4.0.1 does not yet support Python 3.15's lazy-import AST.
+        if: matrix.python-version != '3.15'
         run: |
           make lint
       - name: Test with pytest
