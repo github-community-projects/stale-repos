@@ -324,11 +324,7 @@ jobs:
 
 ## Local testing without Docker
 
-1. Have Python v3.11 or greater installed
-1. [Install uv](https://docs.astral.sh/uv/getting-started/installation/)
-1. `uv sync`
-1. `make lint`
-1. `make test`
+See [Local checks](CONTRIBUTING.md#local-checks) for interpreter selection, linting, and testing.
 
 ## License
 
