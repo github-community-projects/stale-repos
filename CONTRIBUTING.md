@@ -13,6 +13,7 @@ All types of contributions are encouraged and valued. See the [Table of Contents
 
 - [I Have a Question](#i-have-a-question)
 - [I Want To Contribute](#i-want-to-contribute)
+  - [Local checks](#local-checks)
 - [Reporting Bugs](#reporting-bugs)
 - [Suggesting Enhancements](#suggesting-enhancements)
 - [Releases](#releases)
@@ -34,6 +35,19 @@ We will then take care of the issue as soon as possible.
 > ### Legal Notice <!-- omit in toc -->
 >
 > When contributing to this project, you must agree that you have authored 100% of the content, that you have the necessary rights to the content and that the content you contribute may be provided under the project license.
+
+### Local checks
+
+The [Python workflow](.github/workflows/python-package.yml) defines the tested interpreters and documents lint exclusions.
+Choose a version without a lint exclusion for these checks.
+
+1. [Install uv](https://docs.astral.sh/uv/getting-started/installation/).
+1. Run `uv sync --python <version>` with the selected version.
+1. Run `make lint`.
+1. Run `make test`.
+
+To test an interpreter excluded from linting, select it with `uv sync --python <version>`.
+Then run `make test` without `make lint`.
 
 ## Reporting Bugs
 
